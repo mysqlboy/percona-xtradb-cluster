@@ -11,6 +11,9 @@
 # Grant privileges required:
 # GRANT PROCESS ON *.* TO 'clustercheckuser'@'localhost' IDENTIFIED BY 'clustercheckpassword!';
 
+
+#### NOTE: THIS IS A MODIFIED SCRIPT THAT WILL ALSO MARK A NODE DOWN IF THE WSREP LOCAL SEND QUEUE IS HIGHER THAN 500
+
 if [[ $1 == '-h' || $1 == '--help' ]];then
     echo "Usage: $0 <user> <pass> <available_when_donor=0|1> <log_file> <available_when_readonly=0|1> <defaults_extra_file>"
     exit
@@ -44,9 +47,13 @@ fi
 WSREP_STATUS=($($MYSQL_CMDLINE -e "SHOW GLOBAL STATUS LIKE 'wsrep_%';"  \
     2>${ERR_FILE} | grep -A 1 -E 'wsrep_local_state$|wsrep_cluster_status$' \
     | sed -n -e '2p'  -e '5p' | tr '\n' ' '))
- 
+
+WSREP_SEND_QUEUE=($($MYSQL_CMDLINE -e "SHOW GLOBAL STATUS LIKE 'wsrep_local_send_queue';" 2>${ERR_FILE} | tail -n 1))
+
+
 if [[ ${WSREP_STATUS[1]} == 'Primary' && ( ${WSREP_STATUS[0]} -eq 4 || \
-    ( ${WSREP_STATUS[0]} -eq 2 && $AVAILABLE_WHEN_DONOR -eq 1 ) ) ]]
+    ( ${WSREP_STATUS[0]} -eq 2 && $AVAILABLE_WHEN_DONOR -eq 1 ) ) && \
+    ${WSREP_SEND_QUEUE} -lt 501 ]]
 then 
 
     # Check only when set to 0 to avoid latency in response.
@@ -88,7 +95,7 @@ else
     echo -en "Connection: close\r\n" 
     echo -en "Content-Length: 57\r\n" 
     echo -en "\r\n" 
-    echo -en "Percona XtraDB Cluster Node is not synced or non-PRIM. \r\n" 
+    echo -en "Percona XtraDB Cluster Node is not synced or non-PRIM or has a wsrep_local_send_queue > 500. \r\n" 
     sleep 0.1
     exit 1
 fi 
