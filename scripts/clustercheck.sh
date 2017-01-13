@@ -50,6 +50,11 @@ WSREP_STATUS=($($MYSQL_CMDLINE -e "SHOW GLOBAL STATUS LIKE 'wsrep_%';"  \
 
 WSREP_SEND_QUEUE=($($MYSQL_CMDLINE -e "SHOW GLOBAL STATUS LIKE 'wsrep_local_send_queue';" 2>${ERR_FILE} | tail -n 1))
 
+# add debug log, output the metrics collected above to a log file when WSREP_SEND_QUEUE is > 0
+if [[ ${WSREP_SEND_QUEUE} -gt 0 ]]
+then
+    echo `date +"%x %H:%M:%S"`, ${WSREP_STATUS[0]}, ${WSREP_STATUS[1]}, ${WSREP_SEND_QUEUE} >> /data/clustercheck.log
+fi
 
 if [[ ${WSREP_STATUS[1]} == 'Primary' && ( ${WSREP_STATUS[0]} -eq 4 || \
     ( ${WSREP_STATUS[0]} -eq 2 && $AVAILABLE_WHEN_DONOR -eq 1 ) ) && \
